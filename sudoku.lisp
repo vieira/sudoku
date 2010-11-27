@@ -52,7 +52,7 @@
 ;transformador de entrada le-tabuleiro: stream ? tabuleiro
 (defun le-tabuleiro(stream)
 
-; passar o with-open-file para a função procura
+; passar o with-open-file para a funcao procura
 	(with-open-file (data stream)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 		(setf tam (parse-integer (read-line data)))
@@ -85,7 +85,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;Funções Auxiliares
+;Funcoes Auxiliares
 
 
 (defun get-linha (tab numero-linha)
@@ -328,13 +328,13 @@
                     (SETQ FRINGE (APPEND (EXPAND-BEST CUR) FRINGE)))))
 		
 
-;;;; Definição da estrutura nó
+;;;; Definicao da estrutura no
 (defstruct no tabuleiro posicao jogadas)
 		
-;;;; Algorítmos genéricos de procura em árvore
+;;;; Algoritmos genericos de procura em arvore
 (defun procura-arvore (estados objectivo sucessores ordem)
-  "Procura, começando em estados e de acordo com ordem e
-  sucessores, um nó que satisfaça a função objectivo."
+  "Procura, comecando em estados e de acordo com ordem e
+  sucessores, um no que satisfaca a funcao objectivo."
   (cond ((funcall objectivo (first estados)) (first estados))
         (t (procura-arvore
              (funcall ordem
@@ -343,20 +343,20 @@
              objectivo sucessores ordem))))
 
 (defun procura-profundidade (inicial objectivo sucessores)
-  "Procura na árvore de estados de tal forma que o ramo n
-  será percorrido depois de atingida as folhas do ramo n-1."
+  "Procura na arvore de estados de tal forma que o ramo n
+  sera percorrido depois de atingida as folhas do ramo n-1."
   (procura-arvore (list inicial) objectivo sucessores #'append))
 
 (defun procura-largura (inicial objectivo sucessores)
-  "Procura na árvore de estados de tal forma que todos os
-  pais são expandidos antes dos filhos serem testados."
+  "Procura na arvore de estados de tal forma que todos os
+  pais sao expandidos antes dos filhos serem testados."
   (procura-arvore (list inicial) objectivo sucessores #'prepend))
   
 (defun prepend (a b) "Coloca b no inicio a" (append b a))
 
-;;;; Funções de suporte à procura em árvore específicas do problema
+;;;; Funcoes de suporte a procura em arvore especificas do problema
 (defun objectivo (estado)
-  "Verifica se estado é o estado objectivo do jogo."
+  "Verifica se estado e o estado objectivo do jogo."
   (let ((jogo-lista (loop for linha in (no-tabuleiro estado) append linha)))
       (loop for valor in jogo-lista 
             never (zerop valor))))
@@ -372,8 +372,8 @@
 ;					 (setf *lista-global* (cons tabnovo *lista-global*))))
 			
 (defun sucessores (actual)
-  "Gera uma lista de nós sucessores do no nó actual dado, tendo em conta
-  as regras do jogo e as possíveis próximas jogadas."
+  "Gera uma lista de nos sucessores do no no actual dado, tendo em conta
+  as regras do jogo e as possiveis proximas jogadas."
   (let ((posicao-vazia (primeira-posicao-vazia actual)))
           (loop for i from 1 to (tabuleiro-dimensao (no-tabuleiro actual))
                    if (is-number-valid-p (no-tabuleiro actual) (car posicao-vazia) (cdr posicao-vazia) i)
@@ -385,8 +385,8 @@
 							 
 							 
 (defun raiz (jogo)
-  "Recebe a matriz relativa ao estado actual do jogo e devolve um nó
-  a ser expandido, quando um dos extremos foi alcançado."
+  "Recebe a matriz relativa ao estado actual do jogo e devolve um no
+  a ser expandido, quando um dos extremos foi alcancado."
   (make-no :tabuleiro jogo
            :posicao NIL
            :jogadas NIL))

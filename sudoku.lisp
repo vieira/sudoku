@@ -1,4 +1,4 @@
-;faz-tabuleiro: inteiro × inteiro ? tabuleiro
+;faz-tabuleiro: inteiro inteiro ? tabuleiro
 (defun faz-tabuleiro(n val)
 	(faz-tabuleiro-aux n n val))
 	
@@ -7,7 +7,7 @@
 		(cons (make-list n :initial-element val)
 			  (faz-tabuleiro-aux n (- size 1) val))))
 
-;construtor tabuleiro-poe-numero:  tabuleiro × inteiro × inteiro × inteiro ? tabuleiro
+;construtor tabuleiro-poe-numero:  tabuleiro inteiro inteiro inteiro ? tabuleiro
 (defun tabuleiro-poe-numero(tab n l c)
 	(setf novotab (copia-tabuleiro tab))
 	(setf (nth c (nth l novotab)) n)
@@ -26,7 +26,7 @@
 		(dotimes(coluna tam)
 			(setf (nth coluna (nth linha novotab)) (tabuleiro-numero tab linha coluna))))))
 
-;selector tabuleiro-numero: tabuleiro × inteiro × inteiro ? inteiro
+;selector tabuleiro-numero: tabuleiro inteiro inteiro ? inteiro
 (defun tabuleiro-numero(tab l c)
 	(nth c (nth l tab)))
 	
@@ -69,7 +69,7 @@
 					(setf st fim)))
 				(le-tabuleiro-aux data tab tam (+ 1 linha)))))
 						
-;transformador de sa´ida escreve-tabuleiro: tabuleiro ? NIL
+;transformador de saida escreve-tabuleiro: tabuleiro ? NIL
 (defun escreve-tabuleiro(tab)
 	(let ((tam (tabuleiro-dimensao tab)) (st 0))
 	(format t "~S" tam)

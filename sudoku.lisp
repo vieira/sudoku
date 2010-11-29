@@ -9,7 +9,7 @@
 (defun faz-tabuleiro (tamanho valor)
   "Cria tabuleiro de dimensão 'tamanho' inicilizado a 'valor'
   faz-tabuleiro: inteiro x inteiro -> tabuleiro"
-  (make-list tamanho :initial-element (make-list tamanho :initial-element 0)))
+  (make-list tamanho :initial-element (make-list tamanho :initial-element valor)))
 
 
 (defun tabuleiro-poe-numero (tabuleiro numero linha coluna)
@@ -51,16 +51,16 @@
   tabuleiro.
   le-tabuleiro: stream -> tabuleiro"
   (with-open-file (f ficheiro)
-    (let ((dimensao (parse-integer (read-line f))))
-      (loop for line = (read-line f NIL NIL) 
-            while line 
-            collect 
-            (read-from-string 
-              (concatenate 'string "(" line ")"))))))
+    (and (parse-integer (read-line f))
+         (loop for line = (read-line f NIL NIL) 
+               while line 
+               collect 
+               (read-from-string 
+                 (concatenate 'string "(" line ")"))))))
 
-(defun escreve-tabuleiro (tabuleiro)
-  "Recebe um tabuleiro e imprime as linhas que o compõe
-  com os dígitos separados por um espaço.
+    (defun escreve-tabuleiro (tabuleiro)
+      "Recebe um tabuleiro e imprime as linhas que o compõe
+      com os dígitos separados por um espaço.
   escreve-tabuleiro: tabuleiro -> NIL"
   (loop for linha in tabuleiro
         do (format t "~{~S~^ ~}~%" linha)))

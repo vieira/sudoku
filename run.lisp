@@ -1,6 +1,6 @@
 ;;;; Atalho Sudoku
-(load "sudoku.lisp")
 (compile-file "sudoku.lisp")
+(load "sudoku.fas")
 (defun resolve (ficheiro)
   (let ((problema (le-tabuleiro ficheiro)))
     (escreve-tabuleiro (no-tabuleiro (procura-profundidade 

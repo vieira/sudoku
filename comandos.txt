@@ -1,4 +1,0 @@
-(load "z:\\desktop\\git\\ia\\sudoku.lisp")
-(setf stream "z:desktop/ia/git/stream.txt")
-
-(setf tab1 (le-tabuleiro stream))

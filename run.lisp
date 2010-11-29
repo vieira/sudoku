@@ -1,5 +1,5 @@
 ;;;; Atalho Sudoku
-(compile-file "sudoku.lisp")
+(compile-file "sudoku.lisp" :output-file "sudoku.fas")
 (load "sudoku.fas")
 (defun resolve (ficheiro)
   (let ((problema (le-tabuleiro ficheiro)))

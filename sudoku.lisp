@@ -106,7 +106,7 @@
   sucessores: nó -> lista de nós"
   (let* ((tabuleiro (no-tabuleiro actual))
          (tamanho-tabuleiro (tabuleiro-dimensao tabuleiro))
-         (posicao (posicao-vazia tabuleiro 
+         (posicao (posicao-vazia tabuleiro
                                  :criterio #'posicao-mais-restringida))
          (linha (car posicao))
          (coluna (cdr posicao)))

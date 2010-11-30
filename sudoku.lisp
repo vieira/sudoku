@@ -66,9 +66,37 @@
         do (format t "~{~S~^ ~}~%" linha)))
 
 	
+;;;; Função Geral de Procura
+(defun procura (ficheiro &optional (estrategia :informada))
+  (cond ((eq estrategia :profundidade) 
+         (no-tabuleiro 
+           (procura-profundidade 
+             (make-no :tabuleiro (le-tabuleiro ficheiro))
+             #'objectivo 
+             #'sucessores)))
+        ((eq estrategia :largura)
+         (no-tabuleiro 
+           (procura-largura 
+             (make-no :tabuleiro (le-tabuleiro ficheiro))
+             #'objectivo 
+             #'sucessores)))
+        ((eq estrategia :retrocesso)
+         (no-tabuleiro 
+           (procura-profundidade 
+             (make-no :tabuleiro (le-tabuleiro ficheiro))
+             #'objectivo 
+             #'sucessores)))
+        ((eq estrategia :informada)
+         (no-tabuleiro 
+           (retrocesso-informada
+             (make-no :tabuleiro (le-tabuleiro ficheiro))
+             #'objectivo 
+             #'sucessores)))
+        (t (print "Estratégia indisponível"))))
+
 
 ;;;; Algoritmos genericos de procura em arvore
-(defun procura-arvore (estados objectivo sucessores ordem)
+(defun procura-arvore (estados objectivo sucessores ordem) 
   "Procura, comecando em estados e de acordo com ordem e
   sucessores, um no que satisfaca a funcao objectivo."
   (cond ((funcall objectivo (first estados)) (first estados))
@@ -90,6 +118,14 @@
   
 (defun prepend (a b) "Coloca b no inicio a" (append b a))
 
+(defun retrocesso-informada (inicial objectivo sucessores)
+  (procura-arvore (list inicial)
+                  objectivo 
+                  #'(lambda (no)
+                      (funcall 
+                        sucessores no :criterio #'posicao-mais-restringida))
+                  #'append))
+
 
 ;;;; Funcoes de suporte a procura em arvore especificas do problema
 (defun objectivo (estado)
@@ -100,14 +136,13 @@
           never (zerop valor))))
 
 
-(defun sucessores (actual)
+(defun sucessores (actual &key (criterio #'first))
   "Gera uma lista de nos sucessores do no no actual dado, tendo em conta
   as regras do jogo e as possiveis proximas jogadas.
   sucessores: nó -> lista de nós"
   (let* ((tabuleiro (no-tabuleiro actual))
          (tamanho-tabuleiro (tabuleiro-dimensao tabuleiro))
-         (posicao (posicao-vazia tabuleiro
-                                 :criterio #'posicao-mais-restringida))
+         (posicao (posicao-vazia tabuleiro :criterio criterio))
          (linha (car posicao))
          (coluna (cdr posicao)))
     (loop for numero from 1 to tamanho-tabuleiro
@@ -133,9 +168,9 @@
          (l (* (floor (/ linha tamanho-grupo)) tamanho-grupo))
          (c (* (floor (/ coluna tamanho-grupo)) tamanho-grupo)))
     (loop for i from 0 below tamanho-tabuleiro do
-          (and (or (= numero (tabuleiro-numero tabuleiro linha i)) ; linha
-                   (= numero (tabuleiro-numero tabuleiro i coluna)) ; coluna
-                   (= numero (tabuleiro-numero ; caixa
+          (and (or (= numero (tabuleiro-numero tabuleiro linha i)) 
+                   (= numero (tabuleiro-numero tabuleiro i coluna))
+                   (= numero (tabuleiro-numero
                                 tabuleiro 
                                 (+ l (mod i tamanho-grupo))
                                 (+ c (floor (/ i tamanho-grupo))))))
@@ -169,7 +204,7 @@
                            collect (cons l c)))))))
 
 
-;;;; Heurística MRV para BT
+;;;; Heurística MRV (ou Most Constrained Variable)
 (defun posicao-mais-restringida (tabuleiro posicoes)
   (loop for posicao in posicoes
         for restricoes = (numero-restricoes tabuleiro 

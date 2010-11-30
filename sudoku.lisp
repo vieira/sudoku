@@ -16,8 +16,7 @@
   "Devolve um novo tabuleiro construído a partir da inserção
   de um 'numero' na 'linha' e 'coluna' de 'tabuleiro'
   tabuleiro-por-numero: tabuleiro x inteiro x inteiro x inteiro -> tabuleiro"
-  (let ((novo-tabuleiro (loop for linha in tabuleiro
-                              collect (copy-list linha))))
+  (let ((novo-tabuleiro (copy-tree tabuleiro)))
     (and (setf (nth coluna (nth linha novo-tabuleiro)) numero)
          novo-tabuleiro)))
 
@@ -133,7 +132,7 @@
   (let ((tabuleiro-lista 
           (loop for linha in (no-tabuleiro estado) append linha)))
     (loop for valor in tabuleiro-lista 
-          never (zerop valor))))
+          never (or (listp valor) (zerop valor)))))
 
 
 (defun sucessores (actual &key (criterio #'first))
@@ -168,12 +167,15 @@
          (l (* (floor (/ linha tamanho-grupo)) tamanho-grupo))
          (c (* (floor (/ coluna tamanho-grupo)) tamanho-grupo)))
     (loop for i from 0 below tamanho-tabuleiro do
-          (and (or (= numero (tabuleiro-numero tabuleiro linha i)) 
-                   (= numero (tabuleiro-numero tabuleiro i coluna))
-                   (= numero (tabuleiro-numero
-                                tabuleiro 
+          (let ((numero-linha (tabuleiro-numero tabuleiro linha i))
+                (numero-coluna (tabuleiro-numero tabuleiro coluna i))
+                (numero-caixa (tabuleiro-numero
+                                tabuleiro
                                 (+ l (mod i tamanho-grupo))
                                 (+ c (floor (/ i tamanho-grupo))))))
+          (and (or (if (integerp numero-linha) (= numero numero-linha)))
+                   (if (integerp numero-coluna) (= numero numero-coluna))
+                   (if (integerp numero-caixa) (= numero numero-caixa)))
                (return NIL))
           finally (return T))))
 
@@ -207,9 +209,9 @@
 ;;;; Heurística MRV (ou Most Constrained Variable)
 (defun posicao-mais-restringida (tabuleiro posicoes)
   (loop for posicao in posicoes
-        for restricoes = (numero-restricoes tabuleiro 
-                                            (car posicao) 
-                                            (cdr posicao))
+        for restricoes = (length (restricoes tabuleiro 
+                                             (car posicao) 
+                                             (cdr posicao)))
         with mais-restringida = nil 
         with mais-restricoes = 0
         when (> restricoes mais-restricoes)
@@ -218,7 +220,7 @@
         finally (return mais-restringida)))
 
 
-(defun numero-restricoes (tabuleiro linha coluna)
+(defun restricoes (tabuleiro linha coluna)
   (let* ((tamanho-tabuleiro (tabuleiro-dimensao tabuleiro))
          (tamanho-grupo (floor (log tamanho-tabuleiro 2)))
          (l (* (floor (/ linha tamanho-grupo)) tamanho-grupo))
@@ -230,10 +232,43 @@
                                 tabuleiro
                                 (+ l (mod i tamanho-grupo))
                                 (+ c (floor (/ i tamanho-grupo))))))
-            (if (not (zerop numero-linha))
+            (if (and (integerp numero-linha) (> numero-linha 0))
               (setf restricoes (cons numero-linha restricoes)))
-            (if (not (zerop numero-coluna))
+            (if (and (integerp numero-coluna) (> numero-coluna 0))
               (setf restricoes (cons numero-coluna restricoes)))
-            (if (not (zerop numero-caixa))
+            (if (and (integerp numero-caixa) (> numero-caixa 0))
               (setf restricoes (cons numero-caixa restricoes))))
-            finally (return (length (remove-duplicates restricoes))))))
+            finally (return (remove-duplicates restricoes)))))
+
+
+;;;; Propagação de Restrições
+;;; TODO(vieira@yubo.be): !!!DESTRUCTIVO!!!
+(defun atribui(tabuleiro objectivo)
+  (let* ((tamanho-tabuleiro (tabuleiro-dimensao tabuleiro))
+         (todos-numeros (loop for i from 1 to tamanho-tabuleiro collect i)))
+    (loop for i from 0 to tamanho-tabuleiro
+          do (loop for j from 0 to tamanho-tabuleiro
+                   when 
+                   (or (listp (tabuleiro-numero tabuleiro i j))
+                       (zerop (tabuleiro-numero tabuleiro i j)))
+                   do
+                   (let* ((posicao (tabuleiro-numero tabuleiro i j))
+                          (possiveis (cond ((integerp posicao)
+                                            (set-difference
+                                              todos-numeros
+                                              (restricoes tabuleiro i j)))
+                                           ((listp posicao) posicao))))
+                     (cond ((zerop (length possiveis))
+                            (return NIL))
+                           ((= (length possiveis) 1)
+                            (and (setf (nth j (nth i tabuleiro)) 
+                                       (car possiveis))
+                                 (atribui tabuleiro objectivo)))
+                           (t (loop for numero in possiveis
+                                    if (not (numero-valido-p 
+                                              tabuleiro 
+                                              numero 
+                                              i 
+                                              j))
+                                    do (delete numero possiveis))))))
+          finally (return tabuleiro))))

@@ -168,15 +168,15 @@
          (c (* (floor (/ coluna tamanho-grupo)) tamanho-grupo)))
     (loop for i from 0 below tamanho-tabuleiro do
           (let ((numero-linha (tabuleiro-numero tabuleiro linha i))
-                (numero-coluna (tabuleiro-numero tabuleiro coluna i))
+                (numero-coluna (tabuleiro-numero tabuleiro i coluna))
                 (numero-caixa (tabuleiro-numero
                                 tabuleiro
                                 (+ l (mod i tamanho-grupo))
                                 (+ c (floor (/ i tamanho-grupo))))))
-          (and (or (if (integerp numero-linha) (= numero numero-linha)))
-                   (if (integerp numero-coluna) (= numero numero-coluna))
-                   (if (integerp numero-caixa) (= numero numero-caixa)))
-               (return NIL))
+          (and (or (= numero numero-linha)
+                   (= numero numero-coluna)
+                   (= numero numero-caixa))
+               (return NIL)))
           finally (return T))))
 
 
@@ -259,6 +259,7 @@
                                               (restricoes tabuleiro i j)))
                                            ((listp posicao) posicao))))
                      (cond ((zerop (length possiveis))
+                            (print "NIL")
                             (return NIL))
                            ((= (length possiveis) 1)
                             (and (setf (nth j (nth i tabuleiro)) 

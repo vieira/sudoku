@@ -176,13 +176,6 @@
             finally (return sucessores)))))
                      
 
-
-(defun raiz (jogo)
-  "Recebe a matriz relativa ao estado actual do jogo e devolve um no
-  a ser expandido, quando um dos extremos foi alcancado."
-  (make-no :tabuleiro jogo))
-
-
 ;;;; Funções específicas do Sudoku
 (defun numero-valido-p (tabuleiro numero linha coluna)
   "Recebe um 'tabuleiro' e verifica se o 'numero' fornecido é uma jogada
@@ -247,7 +240,7 @@
         finally (return mais-restringida)))
 
 
-;;;; Propagação de Restrições
+;;;; Heurística de Propagação de Restrições
 (defun propaga (tabuleiro)
   (let* ((tamanho-tabuleiro (tabuleiro-dimensao tabuleiro))
          (todos-numeros (loop for i from 1 to tamanho-tabuleiro collect i))

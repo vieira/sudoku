@@ -9,7 +9,12 @@
 (defun faz-tabuleiro (tamanho valor)
   "Cria tabuleiro de dimensão 'tamanho' inicilizado a 'valor'
   faz-tabuleiro: inteiro x inteiro -> tabuleiro"
-  (make-list tamanho :initial-element (make-list tamanho :initial-element valor)))
+  (if (listp valor)
+    (loop for i from 0 below tamanho collect
+          (loop for i from 0 below tamanho collect
+                (copy-list valor)))
+    (loop for i from 0 below tamanho collect
+          (make-list tamanho :initial-element valor))))
 
 
 (defun tabuleiro-poe-numero (tabuleiro numero linha coluna)
@@ -57,12 +62,17 @@
                (read-from-string 
                  (concatenate 'string "(" line ")"))))))
 
-    (defun escreve-tabuleiro (tabuleiro)
-      "Recebe um tabuleiro e imprime as linhas que o compõe
-      com os dígitos separados por um espaço.
+(defun escreve-tabuleiro (tabuleiro)
+  "Recebe um tabuleiro e imprime as linhas que o compõe
+  com os dígitos separados por um espaço.
   escreve-tabuleiro: tabuleiro -> NIL"
   (loop for linha in tabuleiro
         do (format t "~{~S~^ ~}~%" linha)))
+
+(defun no-para-tabuleiro (no)
+  (let ((tabuleiro (no-tabuleiro no)))
+    (loop for linha in tabuleiro collect
+          (mapcar #'car linha))))
 
 	
 ;;;; Função Geral de Procura
@@ -86,11 +96,10 @@
              #'objectivo 
              #'sucessores)))
         ((eq estrategia :informada)
-         (no-tabuleiro 
-           (retrocesso-informada
+         (retrocesso-informada
              (make-no :tabuleiro (le-tabuleiro ficheiro))
              #'objectivo 
-             #'sucessores)))
+             #'sucessores))
         (t (print "Estratégia indisponível"))))
 
 
@@ -118,12 +127,15 @@
 (defun prepend (a b) "Coloca b no inicio a" (append b a))
 
 (defun retrocesso-informada (inicial objectivo sucessores)
-  (procura-arvore (list inicial)
-                  objectivo 
-                  #'(lambda (no)
-                      (funcall 
-                        sucessores no :criterio #'posicao-mais-restringida))
-                  #'append))
+  (let ((raiz (make-no :tabuleiro (propaga (no-tabuleiro inicial)))))
+    (no-para-tabuleiro
+      (procura-arvore (list raiz)
+                      objectivo 
+                      #'(lambda (no)
+                          (funcall 
+                            sucessores no :criterio 
+                            #'posicao-mais-restringida))
+                      #'append))))
 
 
 ;;;; Funcoes de suporte a procura em arvore especificas do problema
@@ -132,7 +144,9 @@
   (let ((tabuleiro-lista 
           (loop for linha in (no-tabuleiro estado) append linha)))
     (loop for valor in tabuleiro-lista 
-          never (or (listp valor) (zerop valor)))))
+          always (if (listp valor) 
+                   (= (length valor) 1) 
+                   (not (zerop valor))))))
 
 
 (defun sucessores (actual &key (criterio #'first))
@@ -144,10 +158,23 @@
          (posicao (posicao-vazia tabuleiro :criterio criterio))
          (linha (car posicao))
          (coluna (cdr posicao)))
-    (loop for numero from 1 to tamanho-tabuleiro
-          when (numero-valido-p tabuleiro numero linha coluna)
-          collect (make-no :tabuleiro (tabuleiro-poe-numero 
-                                        tabuleiro numero linha coluna)))))
+    (if (eql criterio #'first)
+      (loop for numero from 1 to tamanho-tabuleiro
+            when (numero-valido-p tabuleiro numero linha coluna)
+            collect (make-no :tabuleiro (tabuleiro-poe-numero 
+                                          tabuleiro numero linha coluna)))
+      (loop for numero in (tabuleiro-numero tabuleiro linha coluna)
+            with sucessores = NIL
+            do (let ((sucessor (atribui (copy-tree tabuleiro)
+                                        numero
+                                        linha
+                                        coluna)))
+                      (or (null sucessor)
+                          (setf sucessores
+                                (cons (make-no :tabuleiro sucessor) 
+                                      sucessores))))
+            finally (return sucessores)))))
+                     
 
 
 (defun raiz (jogo)
@@ -167,16 +194,13 @@
          (l (* (floor (/ linha tamanho-grupo)) tamanho-grupo))
          (c (* (floor (/ coluna tamanho-grupo)) tamanho-grupo)))
     (loop for i from 0 below tamanho-tabuleiro do
-          (let ((numero-linha (tabuleiro-numero tabuleiro linha i))
-                (numero-coluna (tabuleiro-numero tabuleiro i coluna))
-                (numero-caixa (tabuleiro-numero
-                                tabuleiro
+          (and (or (= numero (tabuleiro-numero tabuleiro linha i))
+                   (= numero (tabuleiro-numero tabuleiro i coluna))
+                   (= numero (tabuleiro-numero 
+                               tabuleiro
                                 (+ l (mod i tamanho-grupo))
                                 (+ c (floor (/ i tamanho-grupo))))))
-          (and (or (= numero numero-linha)
-                   (= numero numero-coluna)
-                   (= numero numero-caixa))
-               (return NIL)))
+               (return NIL))
           finally (return T))))
 
 
@@ -202,74 +226,122 @@
       (funcall criterio tabuleiro
                (loop for l from 0 below tamanho-tabuleiro append 
                      (loop for c from 0 below tamanho-tabuleiro
-                           when (zerop (tabuleiro-numero tabuleiro l c))
+                           when (if (listp (tabuleiro-numero tabuleiro l c))
+                                  (> (length (tabuleiro-numero tabuleiro l c))
+                                     1)
+                                  (zerop (tabuleiro-numero tabuleiro l c)))
                            collect (cons l c)))))))
 
 
 ;;;; Heurística MRV (ou Most Constrained Variable)
 (defun posicao-mais-restringida (tabuleiro posicoes)
   (loop for posicao in posicoes
-        for restricoes = (length (restricoes tabuleiro 
-                                             (car posicao) 
-                                             (cdr posicao)))
-        with mais-restringida = nil 
-        with mais-restricoes = 0
-        when (> restricoes mais-restricoes)
-        do (and (setf mais-restricoes restricoes)
+        for jogadas-possiveis = (length (tabuleiro-numero tabuleiro
+                                                          (car posicao)
+                                                          (cdr posicao)))
+        with mais-restringida = NIL
+        with menos-jogadas = (tabuleiro-dimensao tabuleiro)
+        when (< jogadas-possiveis menos-jogadas)
+        do (and (setf menos-jogadas jogadas-possiveis)
                 (setf mais-restringida posicao))
         finally (return mais-restringida)))
 
 
-(defun restricoes (tabuleiro linha coluna)
+;;;; Propagação de Restrições
+(defun propaga (tabuleiro)
+  (let* ((tamanho-tabuleiro (tabuleiro-dimensao tabuleiro))
+         (todos-numeros (loop for i from 1 to tamanho-tabuleiro collect i))
+         (novo-tabuleiro (faz-tabuleiro tamanho-tabuleiro todos-numeros)))
+    (loop for i from 0 below tamanho-tabuleiro do
+          (loop for j from 0 below tamanho-tabuleiro do
+                (let ((numero (tabuleiro-numero tabuleiro i j)))
+                  (if (and (find numero todos-numeros)
+                           (not (atribui novo-tabuleiro numero i j)))
+                    (return-from propaga NIL))))) 
+    novo-tabuleiro))
+
+
+(defun atribui (tabuleiro numero linha coluna)
+  (let ((restantes-numeros 
+          (remove numero (tabuleiro-numero tabuleiro linha coluna))))
+    (and (loop for n in restantes-numeros
+               always (elimina tabuleiro n linha coluna))
+         tabuleiro)))
+
+
+(defun elimina (tabuleiro numero linha coluna)
+  (let ((numeros-posicao (tabuleiro-numero tabuleiro linha coluna)))
+
+    ;; Se o número não existe na posição dada é porque já foi eliminado.
+    (if (not (find numero numeros-posicao))
+      (return-from elimina tabuleiro))
+
+    ;; Elimina o número da linha e coluna do tabuleiro recebido como argumento.
+    (setf numeros-posicao (remove numero numeros-posicao))
+    (setf (nth coluna (nth linha tabuleiro)) numeros-posicao)
+    
+    ;; Se só há um número possível para uma posicao elimina esse número
+    ;; das posições relacionadas. (linha, coluna, caixa)
+    (cond ((= (length numeros-posicao) 0)
+           (return-from elimina NIL))
+          ((= (length numeros-posicao) 1)
+           (or (loop for cada-posicao in (relacionadas tabuleiro linha coluna)
+                     always (elimina tabuleiro
+                                     (car numeros-posicao)
+                                     (car cada-posicao)
+                                     (cdr cada-posicao)))
+               (return-from elimina NIL))))
+    
+    ;; Se há secção onde número aparece uma única vez então coloca número
+    ;; nessa posição.
+    (loop for cada-seccao in (seccoes tabuleiro linha coluna) do
+          (let ((posicoes-numero 
+                  (loop for posicao in cada-seccao
+                        if (find numero (tabuleiro-numero tabuleiro 
+                                                          (car posicao) 
+                                                          (cdr posicao)))
+                        collect posicao)))
+            (cond ((= (length posicoes-numero) 0)
+                   (return-from elimina NIL))
+                  ((= (length posicoes-numero) 1)
+                   (or (atribui tabuleiro numero 
+                                (caar posicoes-numero)
+                                (cdr (car posicoes-numero)))
+                       (return-from elimina NIL))))))
+
+    ;; Por fim devolve o tabuleiro com as eliminações aplicadas.
+    tabuleiro))
+
+
+(defun relacionadas (tabuleiro linha coluna)
   (let* ((tamanho-tabuleiro (tabuleiro-dimensao tabuleiro))
          (tamanho-grupo (floor (log tamanho-tabuleiro 2)))
          (l (* (floor (/ linha tamanho-grupo)) tamanho-grupo))
          (c (* (floor (/ coluna tamanho-grupo)) tamanho-grupo)))
-    (loop for i from 0 below tamanho-tabuleiro with restricoes = NIL do
-          (let ((numero-linha (tabuleiro-numero tabuleiro linha i))
-                (numero-coluna (tabuleiro-numero tabuleiro i coluna))
-                (numero-caixa (tabuleiro-numero 
-                                tabuleiro
-                                (+ l (mod i tamanho-grupo))
-                                (+ c (floor (/ i tamanho-grupo))))))
-            (if (and (integerp numero-linha) (> numero-linha 0))
-              (setf restricoes (cons numero-linha restricoes)))
-            (if (and (integerp numero-coluna) (> numero-coluna 0))
-              (setf restricoes (cons numero-coluna restricoes)))
-            (if (and (integerp numero-caixa) (> numero-caixa 0))
-              (setf restricoes (cons numero-caixa restricoes))))
-            finally (return (remove-duplicates restricoes)))))
+    (remove-if #'(lambda (x) (and (= (car x) linha) (= (cdr x) coluna)))
+               (remove-duplicates
+                 (loop for i from 0 below tamanho-tabuleiro append
+                       (list (cons linha i)
+                             (cons i coluna)
+                             (cons (+ l (mod i tamanho-grupo))
+                                   (+ c (floor (/ i tamanho-grupo))))))
+                 :test #'(lambda (x y)
+                           (and (= (car x) (car y)) (= (cdr x) (cdr y))))))))
 
 
-;;;; Propagação de Restrições
-;;; TODO(vieira@yubo.be): !!!DESTRUCTIVO!!!
-(defun atribui(tabuleiro objectivo)
+(defun seccoes (tabuleiro linha coluna)
   (let* ((tamanho-tabuleiro (tabuleiro-dimensao tabuleiro))
-         (todos-numeros (loop for i from 1 to tamanho-tabuleiro collect i)))
-    (loop for i from 0 to tamanho-tabuleiro
-          do (loop for j from 0 to tamanho-tabuleiro
-                   when 
-                   (or (listp (tabuleiro-numero tabuleiro i j))
-                       (zerop (tabuleiro-numero tabuleiro i j)))
-                   do
-                   (let* ((posicao (tabuleiro-numero tabuleiro i j))
-                          (possiveis (cond ((integerp posicao)
-                                            (set-difference
-                                              todos-numeros
-                                              (restricoes tabuleiro i j)))
-                                           ((listp posicao) posicao))))
-                     (cond ((zerop (length possiveis))
-                            (print "NIL")
-                            (return NIL))
-                           ((= (length possiveis) 1)
-                            (and (setf (nth j (nth i tabuleiro)) 
-                                       (car possiveis))
-                                 (atribui tabuleiro objectivo)))
-                           (t (loop for numero in possiveis
-                                    if (not (numero-valido-p 
-                                              tabuleiro 
-                                              numero 
-                                              i 
-                                              j))
-                                    do (delete numero possiveis))))))
-          finally (return tabuleiro))))
+         (tamanho-grupo (floor (log tamanho-tabuleiro 2)))
+         (l (* (floor (/ linha tamanho-grupo)) tamanho-grupo))
+         (c (* (floor (/ coluna tamanho-grupo)) tamanho-grupo))
+         (posicoes-linha NIL)
+         (posicoes-coluna NIL)
+         (posicoes-caixa NIL))
+    (loop for i from 0 below tamanho-tabuleiro do
+          (and (setf posicoes-linha (cons (cons linha i) posicoes-linha))
+               (setf posicoes-coluna (cons (cons i coluna) posicoes-coluna))
+               (setf posicoes-caixa 
+                     (cons (cons (+ l (mod i tamanho-grupo))
+                                 (+ c (floor (/ i tamanho-grupo))))
+                           posicoes-caixa))))
+    (list posicoes-coluna posicoes-linha posicoes-caixa)))

@@ -3,6 +3,7 @@
 
 ;;;; Definição da estrutura nó
 (defstruct no tabuleiro)
+(defstruct assignment posicao numero)
 
 
 ;;;; Constructores
@@ -66,6 +67,7 @@
   "Recebe um tabuleiro e imprime as linhas que o compõe
   com os dígitos separados por um espaço.
   escreve-tabuleiro: tabuleiro -> NIL"
+  (format t "~d~%" (length tabuleiro))
   (loop for linha in tabuleiro
         do (format t "~{~S~^ ~}~%" linha)))
 
@@ -73,6 +75,17 @@
   (let ((tabuleiro (no-tabuleiro no)))
     (loop for linha in tabuleiro collect
           (mapcar #'car linha))))
+
+(defun assignments-tabuleiro (assignments)
+  (let* ((tamanho-tabuleiro (sqrt (length assignments)))
+         (tabuleiro (faz-tabuleiro tamanho-tabuleiro 0)))
+    (loop for cada-assignment in assignments do
+          (setf 
+            (nth 
+              (cdr (assignment-posicao cada-assignment))
+              (nth (car (assignment-posicao cada-assignment))
+                   tabuleiro)) (assignment-numero cada-assignment))
+          finally (return tabuleiro))))
 
 	
 ;;;; Função Geral de Procura
@@ -90,11 +103,11 @@
              #'objectivo 
              #'sucessores)))
         ((eq estrategia :retrocesso)
-         (no-tabuleiro 
-           (procura-profundidade 
+         (assignments-tabuleiro 
+           (retrocesso 
              (make-no :tabuleiro (le-tabuleiro ficheiro))
-             #'objectivo 
-             #'sucessores)))
+             #'objectivo-retrocesso
+             #'sucessores-retrocesso)))
         ((eq estrategia :informada)
          (retrocesso-informada
              (make-no :tabuleiro (le-tabuleiro ficheiro))
@@ -125,6 +138,19 @@
   (procura-arvore (list inicial) objectivo sucessores #'prepend))
   
 (defun prepend (a b) "Coloca b no inicio a" (append b a))
+
+(defun retrocesso (inicial objectivo sucessores)
+  (let ((tamanho-tabuleiro (tabuleiro-dimensao (no-tabuleiro inicial)))
+        (assignments (assignments-iniciais (no-tabuleiro inicial))))
+    (procura-arvore (list assignments)
+                    #'(lambda (assignment) (funcall objectivo
+                                                    tamanho-tabuleiro
+                                                    assignment))
+                    #'(lambda (assignment) (funcall sucessores
+                                                    tamanho-tabuleiro
+                                                    assignment))
+                    #'append)))
+
 
 (defun retrocesso-informada (inicial objectivo sucessores)
   (let ((raiz (make-no :tabuleiro (propaga (no-tabuleiro inicial)))))
@@ -174,7 +200,57 @@
                                 (cons (make-no :tabuleiro sucessor) 
                                       sucessores))))
             finally (return sucessores)))))
-                     
+
+;;;; Funcoes de suporte a procura específicas do backtracking
+(defun assignments-iniciais (tabuleiro)
+  (loop for i from 0 below (tabuleiro-dimensao tabuleiro) append
+        (loop for j from 0 below (tabuleiro-dimensao tabuleiro)
+              when (not (zerop (tabuleiro-numero tabuleiro i j)))
+              collect 
+              (make-assignment :posicao (cons i j)
+                               :numero (tabuleiro-numero tabuleiro i j)))))
+
+
+(defun objectivo-retrocesso (tamanho-tabuleiro assignments)
+  (let ((all-assigned (expt tamanho-tabuleiro 2)))
+    (= (length assignments) all-assigned)))
+
+
+(defun sucessores-retrocesso (tamanho-tabuleiro assignments)
+  (let ((proxima-posicao  (posicao-vazia-retrocesso tamanho-tabuleiro 
+                                                    assignments)))
+    (loop for i from 1 to tamanho-tabuleiro
+          when (assignment-valido-p tamanho-tabuleiro 
+                                    assignments
+                                    i
+                                    (car proxima-posicao)
+                                    (cdr proxima-posicao))
+          collect (cons (make-assignment :posicao proxima-posicao :numero i)
+                        assignments))))
+
+  
+(defun posicao-vazia-retrocesso (tamanho-tabuleiro assignments)
+  (loop for i from 0 below tamanho-tabuleiro do 
+        (loop for j from 0 below tamanho-tabuleiro
+              when 
+              (not (find (cons i j) assignments 
+                         :test #'(lambda (x y)
+                                   (and 
+                                     (= (car x) 
+                                        (car (assignment-posicao y)))
+                                     (= (cdr x) 
+                                        (cdr (assignment-posicao y)))))))
+                   do (return-from posicao-vazia-retrocesso (cons i j)))))
+
+(defun assignment-valido-p (tamanho-tabuleiro assignments numero linha coluna)
+  (loop for posicao in (relacionadas tamanho-tabuleiro linha coluna)
+        never (find posicao assignments :test 
+                    #'(lambda (x y) (and (= (car x) 
+                                            (car (assignment-posicao y)))
+                                         (= (cdr x) 
+                                            (cdr (assignment-posicao y)))
+                                         (= numero 
+                                            (assignment-numero y)))))))
 
 ;;;; Funções específicas do Sudoku
 (defun numero-valido-p (tabuleiro numero linha coluna)
@@ -263,7 +339,8 @@
 
 
 (defun elimina (tabuleiro numero linha coluna)
-  (let ((numeros-posicao (tabuleiro-numero tabuleiro linha coluna)))
+  (let ((numeros-posicao (tabuleiro-numero tabuleiro linha coluna))
+        (tamanho-tabuleiro (tabuleiro-dimensao tabuleiro)))
 
     ;; Se o número não existe na posição dada é porque já foi eliminado.
     (if (not (find numero numeros-posicao))
@@ -278,7 +355,8 @@
     (cond ((= (length numeros-posicao) 0)
            (return-from elimina NIL))
           ((= (length numeros-posicao) 1)
-           (or (loop for cada-posicao in (relacionadas tabuleiro linha coluna)
+           (or (loop for cada-posicao 
+                     in (relacionadas tamanho-tabuleiro linha coluna)
                      always (elimina tabuleiro
                                      (car numeros-posicao)
                                      (car cada-posicao)
@@ -287,7 +365,7 @@
     
     ;; Se há secção onde número aparece uma única vez então coloca número
     ;; nessa posição.
-    (loop for cada-seccao in (seccoes tabuleiro linha coluna) do
+    (loop for cada-seccao in (seccoes tamanho-tabuleiro linha coluna) do
           (let ((posicoes-numero 
                   (loop for posicao in cada-seccao
                         if (find numero (tabuleiro-numero tabuleiro 
@@ -306,9 +384,8 @@
     tabuleiro))
 
 
-(defun relacionadas (tabuleiro linha coluna)
-  (let* ((tamanho-tabuleiro (tabuleiro-dimensao tabuleiro))
-         (tamanho-grupo (floor (log tamanho-tabuleiro 2)))
+(defun relacionadas (tamanho-tabuleiro linha coluna)
+  (let* ((tamanho-grupo (floor (log tamanho-tabuleiro 2)))
          (l (* (floor (/ linha tamanho-grupo)) tamanho-grupo))
          (c (* (floor (/ coluna tamanho-grupo)) tamanho-grupo)))
     (remove-if #'(lambda (x) (and (= (car x) linha) (= (cdr x) coluna)))
@@ -322,9 +399,8 @@
                            (and (= (car x) (car y)) (= (cdr x) (cdr y))))))))
 
 
-(defun seccoes (tabuleiro linha coluna)
-  (let* ((tamanho-tabuleiro (tabuleiro-dimensao tabuleiro))
-         (tamanho-grupo (floor (log tamanho-tabuleiro 2)))
+(defun seccoes (tamanho-tabuleiro linha coluna)
+  (let* ((tamanho-grupo (floor (log tamanho-tabuleiro 2)))
          (l (* (floor (/ linha tamanho-grupo)) tamanho-grupo))
          (c (* (floor (/ coluna tamanho-grupo)) tamanho-grupo))
          (posicoes-linha NIL)

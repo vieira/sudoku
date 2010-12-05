@@ -111,8 +111,8 @@
         ((eq estrategia :informada)
          (retrocesso-informada
              (make-no :tabuleiro (le-tabuleiro ficheiro))
-             #'objectivo 
-             #'sucessores))
+             #'objectivo-informada 
+             #'sucessores-informada))
         (t (print "Estratégia indisponível"))))
 
 
@@ -156,64 +156,68 @@
   (let ((raiz (make-no :tabuleiro (propaga (no-tabuleiro inicial)))))
     (no-para-tabuleiro
       (procura-arvore (list raiz)
-                      objectivo 
-                      #'(lambda (no)
-                          (funcall 
-                            sucessores no :criterio 
-                            #'posicao-mais-restringida))
+                      objectivo
+                      sucessores
                       #'append))))
 
 
-;;;; Funcoes de suporte a procura em arvore especificas do problema
+;;;; Funcoes objectivo para os vários tipos de procura
 (defun objectivo (estado)
   "Verifica se estado e o estado objectivo do jogo."
   (let ((tabuleiro-lista 
           (loop for linha in (no-tabuleiro estado) append linha)))
     (loop for valor in tabuleiro-lista 
-          always (if (listp valor) 
-                   (= (length valor) 1) 
-                   (not (zerop valor))))))
+          never (zerop valor)))) 
 
 
-(defun sucessores (actual &key (criterio #'first))
-  "Gera uma lista de nos sucessores do no no actual dado, tendo em conta
-  as regras do jogo e as possiveis proximas jogadas.
-  sucessores: nó -> lista de nós"
-  (let* ((tabuleiro (no-tabuleiro actual))
-         (tamanho-tabuleiro (tabuleiro-dimensao tabuleiro))
-         (posicao (posicao-vazia tabuleiro :criterio criterio))
-         (linha (car posicao))
-         (coluna (cdr posicao)))
-    (if (eql criterio #'first)
-      (loop for numero from 1 to tamanho-tabuleiro
-            when (numero-valido-p tabuleiro numero linha coluna)
-            collect (make-no :tabuleiro (tabuleiro-poe-numero 
-                                          tabuleiro numero linha coluna)))
-      (loop for numero in (tabuleiro-numero tabuleiro linha coluna)
-            with sucessores = NIL
-            do (let ((sucessor (atribui (copy-tree tabuleiro)
-                                        numero
-                                        linha
-                                        coluna)))
-                      (or (null sucessor)
-                          (setf sucessores
-                                (cons (make-no :tabuleiro sucessor) 
-                                      sucessores))))
-            finally (return sucessores)))))
-
-;;;; Funcoes de suporte a procura específicas do backtracking
-(defun assignments-iniciais (tabuleiro)
-  (loop for i from 0 below (tabuleiro-dimensao tabuleiro) append
-        (loop for j from 0 below (tabuleiro-dimensao tabuleiro)
-              when (not (zerop (tabuleiro-numero tabuleiro i j)))
-              collect 
-              (make-assignment :posicao (cons i j)
-                               :numero (tabuleiro-numero tabuleiro i j)))))
+(defun objectivo-informada (estado)
+  (let ((tabuleiro-lista
+          (loop for linha in (no-tabuleiro estado) append linha)))
+    (loop for valor in tabuleiro-lista
+          always (= (length valor) 1))))
 
 
 (defun objectivo-retrocesso (tamanho-tabuleiro assignments)
   (let ((all-assigned (expt tamanho-tabuleiro 2)))
     (= (length assignments) all-assigned)))
+
+
+;;;; Funções sucessores para os vários tipos de procura
+(defun sucessores (actual)
+  "Gera uma lista de nos sucessores do no no actual dado, tendo em conta
+  as regras do jogo e as possiveis proximas jogadas.
+  sucessores: nó -> lista de nós"
+  (let* ((tabuleiro (no-tabuleiro actual))
+         (tamanho-tabuleiro (tabuleiro-dimensao tabuleiro))
+         (posicao (posicao-vazia tabuleiro :criterio #'first))
+         (linha (car posicao))
+         (coluna (cdr posicao)))
+      (loop for numero from 1 to tamanho-tabuleiro
+            when (numero-valido-p tabuleiro numero linha coluna)
+            collect (make-no :tabuleiro (tabuleiro-poe-numero 
+                                          tabuleiro numero linha coluna)))))
+
+
+(defun sucessores-informada (actual)
+  "Gera uma lista de nos sucessores do no no actual dado, tendo em conta
+  as regras do jogo e as possiveis proximas jogadas.
+  sucessores: nó -> lista de nós"
+  (let* ((tabuleiro (no-tabuleiro actual))
+         (posicao (posicao-vazia tabuleiro 
+                                 :criterio #'posicao-mais-restringida))
+         (linha (car posicao))
+         (coluna (cdr posicao)))
+    (loop for numero in (tabuleiro-numero tabuleiro linha coluna)
+          with sucessores = NIL
+          do (let ((sucessor (atribui (copy-tree tabuleiro)
+                                      numero
+                                      linha
+                                      coluna)))
+               (or (null sucessor)
+                   (setf sucessores
+                         (cons (make-no :tabuleiro sucessor) 
+                               sucessores))))
+          finally (return sucessores))))
 
 
 (defun sucessores-retrocesso (tamanho-tabuleiro assignments)
@@ -228,7 +232,17 @@
           collect (cons (make-assignment :posicao proxima-posicao :numero i)
                         assignments))))
 
-  
+
+;;;; Funcoes de suporte a procura específicas do backtracking
+(defun assignments-iniciais (tabuleiro)
+  (loop for i from 0 below (tabuleiro-dimensao tabuleiro) append
+        (loop for j from 0 below (tabuleiro-dimensao tabuleiro)
+              when (not (zerop (tabuleiro-numero tabuleiro i j)))
+              collect 
+              (make-assignment :posicao (cons i j)
+                               :numero (tabuleiro-numero tabuleiro i j)))))
+
+
 (defun posicao-vazia-retrocesso (tamanho-tabuleiro assignments)
   (loop for i from 0 below tamanho-tabuleiro do 
         (loop for j from 0 below tamanho-tabuleiro
@@ -242,22 +256,12 @@
                                         (cdr (assignment-posicao y)))))))
                    do (return-from posicao-vazia-retrocesso (cons i j)))))
 
-(defun assignment-valido-p (tamanho-tabuleiro assignments numero linha coluna)
-  (loop for posicao in (relacionadas tamanho-tabuleiro linha coluna)
-        never (find posicao assignments :test 
-                    #'(lambda (x y) (and (= (car x) 
-                                            (car (assignment-posicao y)))
-                                         (= (cdr x) 
-                                            (cdr (assignment-posicao y)))
-                                         (= numero 
-                                            (assignment-numero y)))))))
 
-;;;; Funções específicas do Sudoku
+;;;; Funções para validação de soluções parciais
 (defun numero-valido-p (tabuleiro numero linha coluna)
   "Recebe um 'tabuleiro' e verifica se o 'numero' fornecido é uma jogada
   válida para a posição dada por 'linha' e 'coluna'.
   numero-valido-p: tabuleiro x inteiro x inteiro x inteiro -> booleano"
-  ;; TODO(vieira@yubo.be): Optimizar isto, talvez recebendo tamanho-grupo?
   (let* ((tamanho-tabuleiro (tabuleiro-dimensao tabuleiro))
          (tamanho-grupo (floor (log tamanho-tabuleiro 2)))
          (l (* (floor (/ linha tamanho-grupo)) tamanho-grupo))
@@ -273,6 +277,20 @@
           finally (return T))))
 
 
+(defun assignment-valido-p (tamanho-tabuleiro assignments numero linha coluna)
+  "Recebe uma atribuição e verifica se essa atribuição viola alguma das 
+  atribuições já feitas"
+  (loop for posicao in (relacionadas tamanho-tabuleiro linha coluna)
+        never (find posicao assignments :test 
+                    #'(lambda (x y) (and (= (car x) 
+                                            (car (assignment-posicao y)))
+                                         (= (cdr x) 
+                                            (cdr (assignment-posicao y)))
+                                         (= numero 
+                                            (assignment-numero y)))))))
+
+
+;;;; Funções para determinação de próxima posição a analisar
 (defun posicao-vazia (tabuleiro &key (criterio #'first))
   "Função que recebe um 'tabuleiro' e um 'criterio' e devolve
   a posição vazia que cumpre o 'criterio' especificado. Se
@@ -287,7 +305,7 @@
       (loop for i from 0 below tamanho-tabuleiro do
             (let ((coluna (position 0 (nth i tabuleiro))))
               (if (not (null coluna))
-                (return (cons i coluna)))))
+                (return-from posicao-vazia (cons i coluna)))))
       
       ;; No caso de ser fornecido um critério para a selecção da
       ;; posição vazia, executa-se a função fornecida com a lista
@@ -302,7 +320,7 @@
                            collect (cons l c)))))))
 
 
-;;;; Heurística MRV (ou Most Constrained Variable)
+;;;; Heurística MRV (ou Minimum Remaining Values)
 (defun posicao-mais-restringida (tabuleiro posicoes)
   (loop for posicao in posicoes
         for jogadas-possiveis = (length (tabuleiro-numero tabuleiro

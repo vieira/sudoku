@@ -164,20 +164,22 @@
 ;;;; Funcoes objectivo para os vários tipos de procura
 (defun objectivo (estado)
   "Verifica se estado e o estado objectivo do jogo."
-  (let ((tabuleiro-lista 
-          (loop for linha in (no-tabuleiro estado) append linha)))
-    (loop for valor in tabuleiro-lista 
-          never (zerop valor)))) 
+  (let ((tabuleiro (no-tabuleiro estado)))
+    (loop for linha in tabuleiro 
+          always (loop for valor in linha
+                       never (zerop valor)))))
 
 
 (defun objectivo-informada (estado)
-  (let ((tabuleiro-lista
-          (loop for linha in (no-tabuleiro estado) append linha)))
-    (loop for valor in tabuleiro-lista
-          always (= (length valor) 1))))
+  "Verifica se estado e o estado objectivo do jogo."
+  (let ((tabuleiro (no-tabuleiro estado)))
+    (loop for linha in tabuleiro
+          always (loop for valor in linha
+                       always (= (length valor) 1)))))
 
 
 (defun objectivo-retrocesso (tamanho-tabuleiro assignments)
+  "Verifica se estado e o estado objectivo do jogo."
   (let ((all-assigned (expt tamanho-tabuleiro 2)))
     (= (length assignments) all-assigned)))
 
@@ -243,19 +245,6 @@
                                :numero (tabuleiro-numero tabuleiro i j)))))
 
 
-(defun posicao-vazia-retrocesso (tamanho-tabuleiro assignments)
-  (loop for i from 0 below tamanho-tabuleiro do 
-        (loop for j from 0 below tamanho-tabuleiro
-              when 
-              (not (find (cons i j) assignments 
-                         :test #'(lambda (x y)
-                                   (and 
-                                     (= (car x) 
-                                        (car (assignment-posicao y)))
-                                     (= (cdr x) 
-                                        (cdr (assignment-posicao y)))))))
-                   do (return-from posicao-vazia-retrocesso (cons i j)))))
-
 
 ;;;; Funções para validação de soluções parciais
 (defun numero-valido-p (tabuleiro numero linha coluna)
@@ -305,7 +294,7 @@
       (loop for i from 0 below tamanho-tabuleiro do
             (let ((coluna (position 0 (nth i tabuleiro))))
               (if (not (null coluna))
-                (return-from posicao-vazia (cons i coluna)))))
+                (return (cons i coluna)))))
       
       ;; No caso de ser fornecido um critério para a selecção da
       ;; posição vazia, executa-se a função fornecida com a lista
@@ -313,11 +302,24 @@
       (funcall criterio tabuleiro
                (loop for l from 0 below tamanho-tabuleiro append 
                      (loop for c from 0 below tamanho-tabuleiro
-                           when (if (listp (tabuleiro-numero tabuleiro l c))
-                                  (> (length (tabuleiro-numero tabuleiro l c))
-                                     1)
-                                  (zerop (tabuleiro-numero tabuleiro l c)))
+                           when (> (length (tabuleiro-numero tabuleiro l c)) 
+                                   1)
                            collect (cons l c)))))))
+
+
+(defun posicao-vazia-retrocesso (tamanho-tabuleiro assignments)
+  (loop for i from 0 below tamanho-tabuleiro do 
+        (loop for j from 0 below tamanho-tabuleiro
+              when 
+              (not (find (cons i j) assignments 
+                         :test #'(lambda (x y)
+                                   (and 
+                                     (= (car x) 
+                                        (car (assignment-posicao y)))
+                                     (= (cdr x) 
+                                        (cdr (assignment-posicao y)))))))
+                   do (return-from posicao-vazia-retrocesso (cons i j)))))
+
 
 
 ;;;; Heurística MRV (ou Minimum Remaining Values)

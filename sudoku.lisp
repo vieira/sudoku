@@ -3,7 +3,7 @@
 
 ;;;; Definição da estrutura nó
 (defstruct no tabuleiro)
-(defstruct assignment posicao numero)
+(defstruct assignment tabuleiro posicao)
 
 
 ;;;; Constructores
@@ -76,18 +76,6 @@
     (loop for linha in tabuleiro collect
           (mapcar #'car linha))))
 
-(defun assignments-tabuleiro (assignments)
-  (let* ((tamanho-tabuleiro (sqrt (length assignments)))
-         (tabuleiro (faz-tabuleiro tamanho-tabuleiro 0)))
-    (loop for cada-assignment in assignments do
-          (setf 
-            (nth 
-              (cdr (assignment-posicao cada-assignment))
-              (nth (car (assignment-posicao cada-assignment))
-                   tabuleiro)) (assignment-numero cada-assignment))
-          finally (return tabuleiro))))
-
-	
 ;;;; Função Geral de Procura
 (defun procura (ficheiro &optional (estrategia :informada))
   (cond ((eq estrategia :profundidade) 
@@ -103,11 +91,11 @@
              #'objectivo 
              #'sucessores)))
         ((eq estrategia :retrocesso)
-         (assignments-tabuleiro 
+         (assignment-tabuleiro
            (retrocesso 
-             (make-no :tabuleiro (le-tabuleiro ficheiro))
-             #'objectivo-retrocesso
-             #'sucessores-retrocesso)))
+             (make-assignment :tabuleiro (le-tabuleiro ficheiro)
+                              :posicao (posicao-vazia (le-tabuleiro ficheiro)))
+             #'objectivo-retrocesso)))
         ((eq estrategia :informada)
          (retrocesso-informada
              (make-no :tabuleiro (le-tabuleiro ficheiro))
@@ -139,17 +127,28 @@
   
 (defun prepend (a b) "Coloca b no inicio a" (append b a))
 
-(defun retrocesso (inicial objectivo sucessores)
-  (let ((tamanho-tabuleiro (tabuleiro-dimensao (no-tabuleiro inicial)))
-        (assignments (assignments-iniciais (no-tabuleiro inicial))))
-    (procura-arvore (list assignments)
-                    #'(lambda (assignment) (funcall objectivo
-                                                    tamanho-tabuleiro
-                                                    assignment))
-                    #'(lambda (assignment) (funcall sucessores
-                                                    tamanho-tabuleiro
-                                                    assignment))
-                    #'append)))
+(defun retrocesso (no objectivo)
+  "Passa uma referência de tabuleiro e a posição alterada, quando
+  atinge um candidato parcial que viola alguma das restrições
+  reverte as alterações feitas ao tabuleiro passado como referência
+  e continua a procura"
+  (let* ((tabuleiro (assignment-tabuleiro no))
+         (tamanho-tabuleiro (tabuleiro-dimensao tabuleiro)))
+    (cond ((funcall objectivo no) no)
+          (t (let* ((proxima-posicao (posicao-vazia tabuleiro))
+                    (linha (car proxima-posicao))
+                    (coluna (cdr proxima-posicao)))
+               (loop for i from 1 to tamanho-tabuleiro
+                     when (numero-valido-p tabuleiro i linha coluna)
+                     do (and (setf (nth coluna (nth linha tabuleiro)) i)
+                             (let ((resultado
+                                     (retrocesso (make-assignment 
+                                                   :tabuleiro tabuleiro
+                                                   :posicao proxima-posicao)
+                                                 objectivo)))
+                               (if resultado (return resultado))
+                               (setf (nth coluna (nth linha tabuleiro))
+                                     0)))))))))
 
 
 (defun retrocesso-informada (inicial objectivo sucessores)
@@ -169,6 +168,13 @@
           always (loop for valor in linha
                        never (zerop valor)))))
 
+(defun objectivo-retrocesso (estado)
+  "Verifica se estado e o estado objectivo do jogo."
+  (let ((tabuleiro (assignment-tabuleiro estado)))
+    (loop for linha in tabuleiro 
+          always (loop for valor in linha
+                       never (zerop valor)))))
+
 
 (defun objectivo-informada (estado)
   "Verifica se estado e o estado objectivo do jogo."
@@ -176,13 +182,6 @@
     (loop for linha in tabuleiro
           always (loop for valor in linha
                        always (= (length valor) 1)))))
-
-
-(defun objectivo-retrocesso (tamanho-tabuleiro assignments)
-  "Verifica se estado e o estado objectivo do jogo."
-  (let ((all-assigned (expt tamanho-tabuleiro 2)))
-    (= (length assignments) all-assigned)))
-
 
 ;;;; Funções sucessores para os vários tipos de procura
 (defun sucessores (actual)
@@ -222,30 +221,6 @@
           finally (return sucessores))))
 
 
-(defun sucessores-retrocesso (tamanho-tabuleiro assignments)
-  (let ((proxima-posicao  (posicao-vazia-retrocesso tamanho-tabuleiro 
-                                                    assignments)))
-    (loop for i from 1 to tamanho-tabuleiro
-          when (assignment-valido-p tamanho-tabuleiro 
-                                    assignments
-                                    i
-                                    (car proxima-posicao)
-                                    (cdr proxima-posicao))
-          collect (cons (make-assignment :posicao proxima-posicao :numero i)
-                        assignments))))
-
-
-;;;; Funcoes de suporte a procura específicas do backtracking
-(defun assignments-iniciais (tabuleiro)
-  (loop for i from 0 below (tabuleiro-dimensao tabuleiro) append
-        (loop for j from 0 below (tabuleiro-dimensao tabuleiro)
-              when (not (zerop (tabuleiro-numero tabuleiro i j)))
-              collect 
-              (make-assignment :posicao (cons i j)
-                               :numero (tabuleiro-numero tabuleiro i j)))))
-
-
-
 ;;;; Funções para validação de soluções parciais
 (defun numero-valido-p (tabuleiro numero linha coluna)
   "Recebe um 'tabuleiro' e verifica se o 'numero' fornecido é uma jogada
@@ -264,19 +239,6 @@
                                 (+ c (floor (/ i tamanho-grupo))))))
                (return NIL))
           finally (return T))))
-
-
-(defun assignment-valido-p (tamanho-tabuleiro assignments numero linha coluna)
-  "Recebe uma atribuição e verifica se essa atribuição viola alguma das 
-  atribuições já feitas"
-  (loop for posicao in (relacionadas tamanho-tabuleiro linha coluna)
-        never (find posicao assignments :test 
-                    #'(lambda (x y) (and (= (car x) 
-                                            (car (assignment-posicao y)))
-                                         (= (cdr x) 
-                                            (cdr (assignment-posicao y)))
-                                         (= numero 
-                                            (assignment-numero y)))))))
 
 
 ;;;; Funções para determinação de próxima posição a analisar
@@ -305,21 +267,6 @@
                            when (> (length (tabuleiro-numero tabuleiro l c)) 
                                    1)
                            collect (cons l c)))))))
-
-
-(defun posicao-vazia-retrocesso (tamanho-tabuleiro assignments)
-  (loop for i from 0 below tamanho-tabuleiro do 
-        (loop for j from 0 below tamanho-tabuleiro
-              when 
-              (not (find (cons i j) assignments 
-                         :test #'(lambda (x y)
-                                   (and 
-                                     (= (car x) 
-                                        (car (assignment-posicao y)))
-                                     (= (cdr x) 
-                                        (cdr (assignment-posicao y)))))))
-                   do (return-from posicao-vazia-retrocesso (cons i j)))))
-
 
 
 ;;;; Heurística MRV (ou Minimum Remaining Values)

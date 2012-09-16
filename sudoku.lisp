@@ -1,14 +1,14 @@
 ;;;; Solucionador de Sudoku
 ;;;; 2010 - Projecto de IA
 
-;;;; Definição da estrutura nó
+;;;; Definicao da estrutura no
 (defstruct no tabuleiro)
 (defstruct assignment tabuleiro posicao)
 
 
 ;;;; Constructores
 (defun faz-tabuleiro (tamanho valor)
-  "Cria tabuleiro de dimensão 'tamanho' inicilizado a 'valor'
+  "Cria tabuleiro de dimensao 'tamanho' inicilizado a 'valor'
   faz-tabuleiro: inteiro x inteiro -> tabuleiro"
   (if (listp valor)
     (loop for i from 0 below tamanho collect
@@ -19,7 +19,7 @@
 
 
 (defun tabuleiro-poe-numero (tabuleiro numero linha coluna)
-  "Devolve um novo tabuleiro construído a partir da inserção
+  "Devolve um novo tabuleiro construido a partir da insercao
   de um 'numero' na 'linha' e 'coluna' de 'tabuleiro'
   tabuleiro-por-numero: tabuleiro x inteiro x inteiro x inteiro -> tabuleiro"
   (let ((novo-tabuleiro (copy-tree tabuleiro)))
@@ -28,19 +28,19 @@
 
 ;;;; Selectores
 (defun tabuleiro-numero (tabuleiro linha coluna)
-  "Devolve o valor que se contra na posição dada por 'linha' e 'coluna'
+  "Devolve o valor que se contra na posicao dada por 'linha' e 'coluna'
   tabuleiro-numero: tabuleiro x inteiro x inteiro -> tabuleiro"
   (nth coluna (nth linha tabuleiro)))
 	
 (defun tabuleiro-dimensao (tabuleiro)
-  "Retorna a dimensão do 'tabuleiro' recebido.
+  "Retorna a dimensao do 'tabuleiro' recebido.
   tabuleiro-dimensao: tabuleiro -> inteiro"
 	(length tabuleiro))
 	
 
 ;;;; Reconhecedores
 (defun tabuleiro-p (tabuleiro)
-  "Recebe um elemento e verifica se é um tabuleiro válido.
+  "Recebe um elemento e verifica se e um tabuleiro valido.
   tabuleiro-p: universal -> booleano"
   (typecase tabuleiro
       (list (let ((tamanho (length tabuleiro)))
@@ -52,7 +52,7 @@
 ;;;; Transformadores
 (defun le-tabuleiro (ficheiro)
   "Faz parsing de um ficheiro de texto correspondente
-  à representação de uma matriz e devolve o respectivo
+  a representacao de uma matriz e devolve o respectivo
   tabuleiro.
   le-tabuleiro: stream -> tabuleiro"
   (with-open-file (f ficheiro)
@@ -64,8 +64,8 @@
                  (concatenate 'string "(" line ")"))))))
 
 (defun escreve-tabuleiro (tabuleiro)
-  "Recebe um tabuleiro e imprime as linhas que o compõe
-  com os dígitos separados por um espaço.
+  "Recebe um tabuleiro e imprime as linhas que o compoe
+  com os digitos separados por um espaco.
   escreve-tabuleiro: tabuleiro -> NIL"
   (format t "~d~%" (length tabuleiro))
   (loop for linha in tabuleiro
@@ -76,7 +76,7 @@
     (loop for linha in tabuleiro collect
           (mapcar #'car linha))))
 
-;;;; Função Geral de Procura
+;;;; Funcao Geral de Procura
 (defun procura (ficheiro &optional (estrategia :informada))
   (cond ((eq estrategia :profundidade) 
          (no-tabuleiro 
@@ -101,7 +101,7 @@
              (make-no :tabuleiro (le-tabuleiro ficheiro))
              #'objectivo-informada 
              #'sucessores-informada))
-        (t (print "Estratégia indisponível"))))
+        (t (print "Estrategia desconhecida"))))
 
 
 ;;;; Algoritmos genericos de procura em arvore
@@ -128,9 +128,9 @@
 (defun prepend (a b) "Coloca b no inicio a" (append b a))
 
 (defun retrocesso (no objectivo)
-  "Passa uma referência de tabuleiro e a posição alterada, quando
-  atinge um candidato parcial que viola alguma das restrições
-  reverte as alterações feitas ao tabuleiro passado como referência
+  "Passa uma referencia de tabuleiro e a posicao alterada, quando
+  atinge um candidato parcial que viola alguma das restricoes
+  reverte as alteracoes feitas ao tabuleiro passado como referencia
   e continua a procura"
   (let* ((tabuleiro (assignment-tabuleiro no))
          (tamanho-tabuleiro (tabuleiro-dimensao tabuleiro)))
@@ -160,7 +160,7 @@
                       #'append))))
 
 
-;;;; Funcoes objectivo para os vários tipos de procura
+;;;; Funcoes objectivo para os varios tipos de procura
 (defun objectivo (estado)
   "Verifica se estado e o estado objectivo do jogo."
   (let ((tabuleiro (no-tabuleiro estado)))
@@ -183,11 +183,11 @@
           always (loop for valor in linha
                        always (= (length valor) 1)))))
 
-;;;; Funções sucessores para os vários tipos de procura
+;;;; Funcoes sucessores para os varios tipos de procura
 (defun sucessores (actual)
   "Gera uma lista de nos sucessores do no no actual dado, tendo em conta
   as regras do jogo e as possiveis proximas jogadas.
-  sucessores: nó -> lista de nós"
+  sucessores: no -> lista de nos"
   (let* ((tabuleiro (no-tabuleiro actual))
          (tamanho-tabuleiro (tabuleiro-dimensao tabuleiro))
          (posicao (posicao-vazia tabuleiro :criterio #'first))
@@ -202,7 +202,7 @@
 (defun sucessores-informada (actual)
   "Gera uma lista de nos sucessores do no no actual dado, tendo em conta
   as regras do jogo e as possiveis proximas jogadas.
-  sucessores: nó -> lista de nós"
+  sucessores: no -> lista de nos"
   (let* ((tabuleiro (no-tabuleiro actual))
          (posicao (posicao-vazia tabuleiro 
                                  :criterio #'posicao-mais-restringida))
@@ -221,10 +221,10 @@
           finally (return sucessores))))
 
 
-;;;; Funções para validação de soluções parciais
+;;;; Funcoes para validacao de solucoes parciais
 (defun numero-valido-p (tabuleiro numero linha coluna)
-  "Recebe um 'tabuleiro' e verifica se o 'numero' fornecido é uma jogada
-  válida para a posição dada por 'linha' e 'coluna'.
+  "Recebe um 'tabuleiro' e verifica se o 'numero' fornecido e uma jogada
+  valida para a posicao dada por 'linha' e 'coluna'.
   numero-valido-p: tabuleiro x inteiro x inteiro x inteiro -> booleano"
   (let* ((tamanho-tabuleiro (tabuleiro-dimensao tabuleiro))
          (tamanho-grupo (floor (log tamanho-tabuleiro 2)))
@@ -241,26 +241,26 @@
           finally (return T))))
 
 
-;;;; Funções para determinação de próxima posição a analisar
+;;;; Funcoes para determinar a proxima posicao a analisar
 (defun posicao-vazia (tabuleiro &key (criterio #'first))
-  "Função que recebe um 'tabuleiro' e um 'criterio' e devolve
-  a posição vazia que cumpre o 'criterio' especificado. Se
-  nenhum critério for fornecido devolve, por definição,
-  a primeira posição encontrada que esteja vazia.
+  "Funcao que recebe um 'tabuleiro' e um 'criterio' e devolve
+  a posicao vazia que cumpre o 'criterio' especificado. Se
+  nenhum criterio for fornecido devolve, por definicao,
+  a primeira posicao encontrada que esteja vazia.
   posicao-vazia: tabuleiro x funcao -> par"
   (let ((tamanho-tabuleiro (tabuleiro-dimensao tabuleiro)))
     (if (eql criterio #'first)
-      ;; No caso do critério ser simplesmente a primeira posição
-      ;; vazia evita-se construir a lista de todas as posições
-      ;; retornando logo que apareça a primeira.
+      ;; No caso do criterio ser simplesmente a primeira posicao
+      ;; vazia evita-se construir a lista de todas as posicoes
+      ;; retornando logo que apareca a primeira.
       (loop for i from 0 below tamanho-tabuleiro do
             (let ((coluna (position 0 (nth i tabuleiro))))
               (if (not (null coluna))
                 (return (cons i coluna)))))
       
-      ;; No caso de ser fornecido um critério para a selecção da
-      ;; posição vazia, executa-se a função fornecida com a lista
-      ;; de todas as posições vazias como argumento.
+      ;; No caso de ser fornecido um criterio para a seleccao da
+      ;; posicao vazia, executa-se a funcao fornecida com a lista
+      ;; de todas as posicoes vazias como argumento.
       (funcall criterio tabuleiro
                (loop for l from 0 below tamanho-tabuleiro append 
                      (loop for c from 0 below tamanho-tabuleiro
@@ -269,7 +269,7 @@
                            collect (cons l c)))))))
 
 
-;;;; Heurística MRV (ou Minimum Remaining Values)
+;;;; Heuristica MRV (ou Minimum Remaining Values)
 (defun posicao-mais-restringida (tabuleiro posicoes)
   (loop for posicao in posicoes
         for jogadas-possiveis = (length (tabuleiro-numero tabuleiro
@@ -283,7 +283,7 @@
         finally (return mais-restringida)))
 
 
-;;;; Heurística de Propagação de Restrições
+;;;; Heuristica de Propagacao de Restricoes
 (defun propaga (tabuleiro)
   (let* ((tamanho-tabuleiro (tabuleiro-dimensao tabuleiro))
          (todos-numeros (loop for i from 1 to tamanho-tabuleiro collect i))
@@ -309,16 +309,16 @@
   (let ((numeros-posicao (tabuleiro-numero tabuleiro linha coluna))
         (tamanho-tabuleiro (tabuleiro-dimensao tabuleiro)))
 
-    ;; Se o número não existe na posição dada é porque já foi eliminado.
+    ;; Se o numero nao existe na posicao dada e porque ja foi eliminado.
     (if (not (find numero numeros-posicao))
       (return-from elimina tabuleiro))
 
-    ;; Elimina o número da linha e coluna do tabuleiro recebido como argumento.
+    ;; Elimina o numero da linha e coluna do tabuleiro recebido como argumento.
     (setf numeros-posicao (remove numero numeros-posicao))
     (setf (nth coluna (nth linha tabuleiro)) numeros-posicao)
     
-    ;; Se só há um número possível para uma posicao elimina esse número
-    ;; das posições relacionadas. (linha, coluna, caixa)
+    ;; Se so ha um numero possivel para uma posicao elimina esse numero
+    ;; das posicoes relacionadas. (linha, coluna, caixa)
     (cond ((= (length numeros-posicao) 0)
            (return-from elimina NIL))
           ((= (length numeros-posicao) 1)
@@ -330,8 +330,8 @@
                                      (cdr cada-posicao)))
                (return-from elimina NIL))))
     
-    ;; Se há secção onde número aparece uma única vez então coloca número
-    ;; nessa posição.
+    ;; Se ha seccao onde numero aparece uma unica vez entao coloca numero
+    ;; nessa posicao.
     (loop for cada-seccao in (seccoes tamanho-tabuleiro linha coluna) do
           (let ((posicoes-numero 
                   (loop for posicao in cada-seccao
@@ -347,7 +347,7 @@
                                 (cdr (car posicoes-numero)))
                        (return-from elimina NIL))))))
 
-    ;; Por fim devolve o tabuleiro com as eliminações aplicadas.
+    ;; Por fim devolve o tabuleiro com as eliminacoes aplicadas.
     tabuleiro))
 
 
